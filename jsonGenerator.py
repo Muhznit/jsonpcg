@@ -20,8 +20,19 @@ def traverse(parent_name, data, depth):
         print(strThingToPrint + ': ' + data)
         return
 
-def immediateChildren(data):
+def storeDefinitions(definition, key, definitionStorage):
+    definitionStorage[key] = definition
+    #print ('Adding ' + json.dumps(definition, indent = 2) + ' to definitions')
+
+def immediateChildren(data, definitionStorage):
+    # TODO: Consider modifying data to contain the definition storage.
     strType = ''
+    if 'definitions' in data.keys():
+        definitions = data['definitions']
+        for definitionEntry in definitions.keys():
+            key = '#/definitions/' + definitionEntry
+            storeDefinitions(data['definitions'][definitionEntry], key, definitionStorage)
+        
     if 'type' in data.keys():
         if isinstance(data['type'], str):
             strType = data['type']
@@ -31,9 +42,16 @@ def immediateChildren(data):
     
     strArrRequiredProps = []
     if 'required' in data.keys():
+        # TODO: Have this set data generation to "optional" mode. Generate data by default, but if 'required' is present, generate only that.
         strArrRequiredProps = data['required']
     
     ret = None
+    if '$ref' in data.keys():
+        reference = data['$ref']
+        ret = immediateChildren(definitionStorage[reference], definitionStorage)
+        return ret;
+    
+    # TODO: Break this out into a 'generate data by type' method or something.
     if strType == 'array':
         ret = [];
     elif strType == 'object':
@@ -45,7 +63,14 @@ def immediateChildren(data):
                 ret = '31.192.117.132'
         else:
             ret = 'Lorem ipsum and all that jazz'
+    elif strType == 'boolean':
+        ret = True
     elif strType == 'integer':
+        min = 0
+        max = 32
+        multOf = 1
+        if 'multipleOf' in data:
+            multOf = data['multipleOf']
         if 'maximum' in data:
             max = data['maximum']
         if 'minimum' in data:
@@ -58,19 +83,25 @@ def immediateChildren(data):
             ret = random.randint(min, max)
         else:
             ret = random.randint(max, min)
-    else:
-        ret = 'test'
-        
+        if (multOf > 0):
+            ret = int(ret / multOf)
+            ret *= multOf
+
     if isinstance(ret, dict):
-        for prop in strArrRequiredProps:
-            ret[prop] = immediateChildren(data['properties'][prop])
+        listProps = []
+        if len(strArrRequiredProps) == 0:
+            listProps = data['properties']
+        else:
+            listProps = strArrRequiredProps
+        for prop in listProps:
+            ret[prop] = immediateChildren(data['properties'][prop], definitionStorage)
     
     if isinstance(ret, list):
         defaultMaxItems = 1
         if 'maxItems' in data.keys():
-            defaultMaxItems = data[defaultMaxItems]
+            defaultMaxItems = data['maxItems']
         for prop in range(0, defaultMaxItems):
-            ret.append(immediateChildren(data['items']))
+            ret.append(immediateChildren(data['items'], definitionStorage))
     
     return ret;
 
@@ -84,10 +115,11 @@ if __name__ == '__main__':
     args = argp.parse_args()
     sInput = args.infile.read()
     jsonInput = json.loads(sInput)
+    print ('=== INPUT SCHEMA ===')
+    print (json.dumps(jsonInput, indent = 2))
     
-    traverse('testSchema',jsonInput, 0)
-    ret = immediateChildren(jsonInput)
-    print ();
-    jsonRet = json.dumps(ret, indent=2);
+    ret = immediateChildren(jsonInput, {})
+    print ('=== OUTPUT JSON ===')
+    jsonRet = json.dumps(ret, indent=2, sort_keys = True);
     
     print(jsonRet)
