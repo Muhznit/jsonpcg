@@ -1,4 +1,5 @@
 import json
+import jsonschema
 import argparse
 import random
 
@@ -32,6 +33,15 @@ def immediateChildren(data, definitionStorage):
         for definitionEntry in definitions.keys():
             key = '#/definitions/' + definitionEntry
             storeDefinitions(data['definitions'][definitionEntry], key, definitionStorage)
+            
+    if 'oneOf' in data.keys():
+        possibleSchemas = data['oneOf']
+        index = len(possibleSchemas) - 1
+        if "index" in data.keys():
+            index = immediateChildren(data['index'], definitionStorage)
+            print('choosing schema ' + str(index))
+        chosenSchema = possibleSchemas[index]
+        return immediateChildren(chosenSchema, definitionStorage)
         
     if 'type' in data.keys():
         if isinstance(data['type'], str):
@@ -118,8 +128,12 @@ if __name__ == '__main__':
     print ('=== INPUT SCHEMA ===')
     print (json.dumps(jsonInput, indent = 2))
     
+    traverse('', jsonInput, 0)
     ret = immediateChildren(jsonInput, {})
     print ('=== OUTPUT JSON ===')
     jsonRet = json.dumps(ret, indent=2, sort_keys = True);
+    
+    print ('=== ERRORS ===')
+    jsonschema.validate(ret, jsonInput)
     
     print(jsonRet)
