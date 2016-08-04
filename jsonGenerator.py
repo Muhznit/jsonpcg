@@ -4,8 +4,6 @@ import argparse
 import random
 
 def traverse(parent_name, data, depth):
-    #if data == 'type':
-        
     strThingToPrint = parent_name
     if isinstance(data, list):
         for child in range(0, len(data)):
@@ -27,6 +25,9 @@ def storeDefinitions(definition, key, definitionStorage):
 
 def immediateChildren(data, definitionStorage):
     # TODO: Consider modifying data to contain the definition storage.
+    if 'default' in data.keys():
+        return data['default']
+        
     strType = ''
     if 'definitions' in data.keys():
         definitions = data['definitions']
@@ -40,6 +41,10 @@ def immediateChildren(data, definitionStorage):
         if "index" in data.keys():
             index = immediateChildren(data['index'], definitionStorage)
             print('choosing schema ' + str(index))
+        if index < 0:
+            index = 0
+        if index > len(possibleSchemas) - 1:
+            index %= len(possibleSchemas) - 1
         chosenSchema = possibleSchemas[index]
         return immediateChildren(chosenSchema, definitionStorage)
         
@@ -96,6 +101,9 @@ def immediateChildren(data, definitionStorage):
         if (multOf > 0):
             ret = int(ret / multOf)
             ret *= multOf
+    elif strType == 'null':
+        ret = None
+        
 
     if isinstance(ret, dict):
         listProps = []
@@ -107,10 +115,14 @@ def immediateChildren(data, definitionStorage):
             ret[prop] = immediateChildren(data['properties'][prop], definitionStorage)
     
     if isinstance(ret, list):
+        defaultMinItems = 1
+        if 'minItems' in data.keys():
+            defaultMinItems = data['minItems']
         defaultMaxItems = 1
         if 'maxItems' in data.keys():
             defaultMaxItems = data['maxItems']
-        for prop in range(0, defaultMaxItems):
+        itemCount = random.randint(defaultMinItems, defaultMaxItems)
+        for prop in range(0, itemCount):
             ret.append(immediateChildren(data['items'], definitionStorage))
     
     return ret;
